@@ -1,11 +1,11 @@
 # Thay @member2, @member3, @member4 bằng GitHub username thật của thành viên phụ trách
 # Phần 2: Cloud Infrastructure as Code (Terraform Azure AKS)
-/terraform/             @baongdqu
+/terraform/             @member2
 
 # Phần 3: GitOps (ArgoCD App-of-Apps), Kustomize, Sealed Secrets & Ingress/TLS
-/k8s/                   @member3
-/argocd/                @member3
-/ingress/               @member3
+/k8s/                   @baongdqu
+/argocd/                @baongdqu
+/ingress/               @baongdqu
 
 # Phần 4: Observability Stack & AIOps RCA Bot
 /monitoring/            @member4
