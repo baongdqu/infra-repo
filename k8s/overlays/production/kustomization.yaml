@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+resources:
+  - ../../base
+  - hpa.yaml
+  # Bỏ comment dòng dưới sau khi chạy seal-secrets.ps1 seal để nạp app-secrets đã mã hóa:
+  # - sealed-secret.yaml
+
+labels:
+  - pairs:
+      env: production
+    includeSelectors: false
+
+images:
+  - name: ghcr.io/baongdqu/app-repo/frontend
+    newTag: v1.0.0
+  - name: ghcr.io/baongdqu/app-repo/backend
+    newTag: v1.0.0
+
+patches:
+  - path: patch-resources-replicas.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: postgres
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 5Gi
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: Ingress
+      name: app-ingress
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod
+      - op: replace
+        path: /spec/rules/0/host
+        value: prod.REPLACE_LB_IP.nip.io
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: prod.REPLACE_LB_IP.nip.io
