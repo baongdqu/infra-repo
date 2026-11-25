@@ -1,0 +1,86 @@
+{
+  "uid": "devsecops-app-metrics",
+  "title": "DevSecOps 3-Tier Application Metrics",
+  "tags": ["devsecops", "prometheus", "nestjs", "kubernetes"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "custom",
+        "query": "dev,production",
+        "current": { "text": "production", "value": "production" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pod CPU Usage vs Limits (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[5m])) / sum by (pod) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * 100",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Pod Memory Working Set vs Limits (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / sum by (pod) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * 100",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Backend HTTP Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, route) (rate(http_requests_total{namespace=\"$namespace\", app=\"backend\"}[1m]))",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Backend HTTP 5xx Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(http_requests_total{namespace=\"$namespace\", app=\"backend\", status=~\"5..\"}[1m])) / sum(rate(http_requests_total{namespace=\"$namespace\", app=\"backend\"}[1m]))) * 100",
+          "legendFormat": "5xx Error %"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Backend p95 Request Latency (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"backend\"}[5m])))",
+          "legendFormat": "p95 {{route}}"
+        }
+      ]
+    }
+  ]
+}

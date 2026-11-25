@@ -64,3 +64,47 @@ def test_promtail_values_constraints():
     )
     assert "limits" in data["resources"]
     assert "requests" in data["resources"]
+
+
+def test_servicemonitor_matches_backend_contract():
+    sm = load_yaml("servicemonitor-backend.yaml")
+    assert sm["kind"] == "ServiceMonitor"
+    assert sm["metadata"]["labels"]["release"] == "kube-prometheus-stack"
+    assert sm["spec"]["selector"]["matchLabels"]["app"] == "backend"
+    assert set(sm["spec"]["namespaceSelector"]["matchNames"]) == {"dev", "production"}
+    endpoint = sm["spec"]["endpoints"][0]
+    assert endpoint["port"] == "http"
+    assert endpoint["path"] == "/metrics"
+
+
+def test_prometheus_alert_rules_cover_required_incidents():
+    rules_doc = load_yaml("alert-rules.yaml")
+    assert rules_doc["kind"] == "PrometheusRule"
+    assert rules_doc["metadata"]["labels"]["release"] == "kube-prometheus-stack"
+    rules = [r["alert"] for g in rules_doc["spec"]["groups"] for r in g["rules"]]
+    required = {
+        "PodCrashLoopBackOff",
+        "PodOOMKilled",
+        "PodImagePullBackOff",
+        "HighCpuUsage",
+        "HighMemoryUsage",
+    }
+    assert required.issubset(set(rules))
+
+
+def test_grafana_dashboards_are_valid_json():
+    for name in ("app-metrics-dashboard.json", "loki-logs-dashboard.json"):
+        dashboard = load_json(f"grafana-dashboards/{name}")
+        assert "panels" in dashboard and len(dashboard["panels"]) >= 4
+        assert "title" in dashboard and dashboard["title"]
+
+
+def test_argocd_reference_apps_are_valid():
+    mon_apps = load_all_yaml("argocd-apps/07-monitoring.yaml")
+    assert len(mon_apps) >= 1
+    assert all(app["kind"] == "Application" for app in mon_apps)
+
+    aiops_app = load_yaml("argocd-apps/08-aiops-bot.yaml")
+    assert aiops_app["kind"] == "Application"
+    assert aiops_app["spec"]["destination"]["namespace"] == "aiops"
+    assert aiops_app["spec"]["source"]["path"] == "aiops-bot/k8s"
