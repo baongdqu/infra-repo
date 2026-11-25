@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-bot
+  namespace: aiops
+  labels:
+    app: aiops-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aiops-bot
+  template:
+    metadata:
+      labels:
+        app: aiops-bot
+    spec:
+      serviceAccountName: aiops-bot
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: aiops-bot
+          image: ghcr.io/baongdqu/infra-repo/aiops-bot:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: LOKI_URL
+              value: "http://loki.monitoring.svc.cluster.local:3100"
+            - name: GEMINI_MODEL
+              value: "gemini-2.5-flash"
+            - name: COOLDOWN_SECONDS
+              value: "900"
+            - name: K8S_ENABLED
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: aiops-bot-secrets
+                optional: true
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

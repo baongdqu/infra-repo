@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aiops
+
+resources:
+  - rbac.yaml
+  - service.yaml
+  - deployment.yaml
+  # Uncomment after running seal-aiops-secret.ps1 to generate sealed-secret.yaml:
+  # - sealed-secret.yaml

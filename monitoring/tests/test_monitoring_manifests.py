@@ -108,3 +108,48 @@ def test_argocd_reference_apps_are_valid():
     assert aiops_app["kind"] == "Application"
     assert aiops_app["spec"]["destination"]["namespace"] == "aiops"
     assert aiops_app["spec"]["source"]["path"] == "aiops-bot/k8s"
+
+
+AIOPS_DIR = MONITORING_DIR.parent / "aiops-bot"
+
+
+def load_aiops_yaml(rel_path: str) -> dict:
+    path = AIOPS_DIR / rel_path
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_all_aiops_yaml(rel_path: str) -> list[dict]:
+    path = AIOPS_DIR / rel_path
+    with path.open("r", encoding="utf-8") as f:
+        return [doc for doc in yaml.safe_load_all(f) if doc is not None]
+
+
+def test_aiops_bot_k8s_service_and_deployment_contracts():
+    svc = load_aiops_yaml("k8s/service.yaml")
+    assert svc["kind"] == "Service"
+    assert svc["metadata"]["name"] == "aiops-bot"
+    assert svc["metadata"]["namespace"] == "aiops"
+    assert svc["spec"]["ports"][0]["port"] == 8000
+
+    deploy = load_aiops_yaml("k8s/deployment.yaml")
+    assert deploy["kind"] == "Deployment"
+    assert deploy["metadata"]["namespace"] == "aiops"
+    pod_spec = deploy["spec"]["template"]["spec"]
+    assert pod_spec["serviceAccountName"] == "aiops-bot"
+    assert pod_spec["securityContext"]["runAsNonRoot"] is True
+    assert pod_spec["securityContext"]["runAsUser"] == 1000
+
+
+def test_aiops_bot_rbac_is_read_only():
+    docs = load_all_aiops_yaml("k8s/rbac.yaml")
+    cluster_role = next(d for d in docs if d["kind"] == "ClusterRole")
+    for rule in cluster_role["rules"]:
+        assert set(rule["verbs"]).issubset({"get", "list", "watch"})
+
+
+def test_aiops_bot_dockerfile_is_non_root():
+    dockerfile = (AIOPS_DIR / "Dockerfile").read_text(encoding="utf-8")
+    assert "1000" in dockerfile
+    assert "USER" in dockerfile
+    assert "8000" in dockerfile
