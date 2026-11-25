@@ -153,3 +153,26 @@ def test_aiops_bot_dockerfile_is_non_root():
     assert "1000" in dockerfile
     assert "USER" in dockerfile
     assert "8000" in dockerfile
+
+
+def test_monitoring_kustomization_and_argocd_resources_coverage():
+    kust = load_yaml("kustomization.yaml")
+    assert kust["kind"] == "Kustomization"
+    assert "servicemonitor-backend.yaml" in kust["resources"]
+    assert "alert-rules.yaml" in kust["resources"]
+    cm_names = [cm["name"] for cm in kust["configMapGenerator"]]
+    assert "grafana-dashboard-app-metrics" in cm_names
+    assert "grafana-dashboard-loki-logs" in cm_names
+
+    sm = load_yaml("servicemonitor-backend.yaml")
+    assert "app" in sm["spec"].get("targetLabels", [])
+
+    prom_values = load_yaml("kube-prometheus-stack-values.yaml")
+    routes = prom_values["alertmanager"]["config"]["route"]["routes"]
+    assert any("InfoInhibitor" in m for r in routes for m in r.get("matchers", []))
+
+    mon_apps = load_all_yaml("argocd-apps/07-monitoring.yaml")
+    assert any(
+        app.get("spec", {}).get("source", {}).get("path") == "monitoring"
+        for app in mon_apps
+    )

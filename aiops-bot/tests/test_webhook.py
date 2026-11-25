@@ -88,3 +88,46 @@ def test_webhook_skips_resolved_alerts():
     body = resp.json()
     assert body["processed"] == 0
     assert body["skipped_resolved"] == 1
+
+
+
+def test_webhook_does_not_call_downstream_on_resolved_or_cooldown(monkeypatch):
+    from app.loki_client import LokiClient
+
+    loki_calls = []
+
+    async def spy_fetch(self, namespace: str, pod: str, **kwargs):
+        loki_calls.append((namespace, pod))
+        return "mock logs"
+
+    monkeypatch.setattr(LokiClient, "fetch_pod_logs", spy_fetch)
+    client = _make_test_client()
+
+    # Resolved alert must not call Loki
+    client.post(
+        "/webhook",
+        json={
+            "status": "resolved",
+            "alerts": [
+                {
+                    "status": "resolved",
+                    "labels": {"alertname": "PodOOMKilled", "namespace": "dev", "pod": "p1"},
+                }
+            ],
+        },
+    )
+    assert len(loki_calls) == 0
+
+    # Firing alert calls Loki once, second identical call within cooldown does not call Loki
+    firing_payload = {
+        "status": "firing",
+        "alerts": [
+            {
+                "status": "firing",
+                "labels": {"alertname": "PodOOMKilled", "namespace": "dev", "pod": "p2"},
+            }
+        ],
+    }
+    client.post("/webhook", json=firing_payload)
+    client.post("/webhook", json=firing_payload)
+    assert len(loki_calls) == 1

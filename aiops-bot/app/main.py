@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from app.config import Settings
 from app.cooldown import CooldownCache
@@ -78,9 +79,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 namespace=alert.namespace,
                 pod=alert.pod,
             )
-            k8s_ctx = k8s_client.fetch_pod_context(
-                namespace=alert.namespace,
-                pod=alert.pod,
+            k8s_ctx = await asyncio.to_thread(
+                k8s_client.fetch_pod_context,
+                alert.namespace,
+                alert.pod,
             )
             rca = await gemini_analyzer.analyze_root_cause(
                 alert=alert,

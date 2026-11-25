@@ -63,7 +63,7 @@ alertmanager:
       receiver: "aiops-bot-webhook"
       routes:
         - matchers:
-            - alertname = "Watchdog"
+            - alertname =~ "Watchdog|InfoInhibitor"
           receiver: "null"
     receivers:
       - name: "null"

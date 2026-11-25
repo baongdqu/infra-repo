@@ -48,16 +48,25 @@ class GeminiAnalyzer:
             or k8s_ctx.waiting_reason
             or alert.alertname
         )
+        log_tail = logs[-250:] if len(logs) > 250 else logs
         return (
             f"[Fallback RCA - {reason}]\n"
             f"1. Nguyên nhân gốc rễ: Phát hiện cảnh báo {alert.alertname} trên pod "
             f"{alert.namespace}/{alert.pod} (trạng thái: {symptom}, exit_code={k8s_ctx.exit_code}, "
             f"restarts={k8s_ctx.restart_count}).\n"
-            f"2. Bằng chứng: K8s Phase={k8s_ctx.pod_phase}; Log snippet: {logs[:250]}\n"
+            f"2. Bằng chứng: K8s Phase={k8s_ctx.pod_phase}; Log snippet: {log_tail}\n"
             f"3. Khắc phục đề xuất:\n"
             f"   - Kiểm tra chi tiết pod: `kubectl describe pod {alert.pod} -n {alert.namespace}`\n"
             f"   - Xem log container trước khi crash: `kubectl logs {alert.pod} -n {alert.namespace} --previous`"
         )
+
+    @staticmethod
+    def _sanitize_error(exc: Exception) -> str:
+        if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+            return f"HTTP {exc.response.status_code}"
+        if isinstance(exc, httpx.TimeoutException):
+            return "Request Timeout"
+        return exc.__class__.__name__
 
     async def analyze_root_cause(
         self, alert: AlertItem, k8s_ctx: K8sPodContext, logs: str
@@ -79,7 +88,8 @@ class GeminiAnalyzer:
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 700,
+                "maxOutputTokens": 1500,
+                "thinkingConfig": {"thinkingBudget": 0},
             },
         }
 
@@ -87,7 +97,7 @@ class GeminiAnalyzer:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(
                     url,
-                    params={"key": self.api_key},
+                    headers={"x-goog-api-key": self.api_key},
                     json=payload,
                 )
                 resp.raise_for_status()
@@ -106,6 +116,7 @@ class GeminiAnalyzer:
                     alert, k8s_ctx, logs, reason="Empty Gemini candidate response"
                 )
         except Exception as exc:
+            safe_reason = f"Gemini API error ({self._sanitize_error(exc)})"
             return self._fallback_rca(
-                alert, k8s_ctx, logs, reason=f"Gemini API error: {exc}"
+                alert, k8s_ctx, logs, reason=safe_reason
             )
