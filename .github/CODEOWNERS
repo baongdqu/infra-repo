@@ -1,4 +1,4 @@
-# Thay @member2, @member3, @member4 bằng GitHub username thật của thành viên phụ trách
+# Thay @member2 bằng GitHub username thật của thành viên phụ trách Phần 2
 # Phần 2: Cloud Infrastructure as Code (Terraform Azure AKS)
 /terraform/             @member2
 
@@ -8,5 +8,5 @@
 /ingress/               @baongdqu
 
 # Phần 4: Observability Stack & AIOps RCA Bot
-/monitoring/            @member4
-/aiops-bot/             @member4
+/monitoring/            @NguyenHungCuongg
+/aiops-bot/             @NguyenHungCuongg
