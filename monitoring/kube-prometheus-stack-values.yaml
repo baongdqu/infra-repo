@@ -1,0 +1,112 @@
+# Resource-optimized Helm values for kube-prometheus-stack on 2x Standard_D2s_v3 (16 GB RAM)
+fullnameOverride: kube-prometheus-stack
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeProxy: false
+    kubeSchedulerAlerting: false
+    kubeControllerManager: false
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    retentionSize: "6GB"
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 8Gi
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 48h
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname", "namespace", "pod"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 15m
+      receiver: "aiops-bot-webhook"
+      routes:
+        - matchers:
+            - alertname =~ "Watchdog|InfoInhibitor"
+          receiver: "null"
+    receivers:
+      - name: "null"
+      - name: "aiops-bot-webhook"
+        webhook_configs:
+          - url: "http://aiops-bot.aiops.svc.cluster.local:8000/webhook"
+            send_resolved: false
+            max_alerts: 10
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      jsonData:
+        maxLines: 1000
+      isDefault: false
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 30m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

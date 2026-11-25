@@ -1,0 +1,66 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devsecops-app-alert-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/part-of: devsecops-observability
+spec:
+  groups:
+    - name: kubernetes-pod-And-resource-alerts
+      rules:
+        - alert: PodCrashLoopBackOff
+          expr: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff", namespace=~"dev|production"} > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is in CrashLoopBackOff"
+            description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} has been restarting repeatedly (CrashLoopBackOff) for over 1 minute."
+
+        - alert: PodOOMKilled
+          expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled", namespace=~"dev|production"} > 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled"
+            description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} exceeded its memory limit and was terminated with OOMKilled (exit code 137)."
+
+        - alert: PodImagePullBackOff
+          expr: kube_pod_container_status_waiting_reason{reason=~"ImagePullBackOff|ErrImagePull", namespace=~"dev|production"} > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} cannot pull container image"
+            description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} is stuck in {{ $labels.reason }}."
+
+        - alert: HighCpuUsage
+          expr: >
+            (
+              sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~"dev|production", container!=""}[5m]))
+              /
+              sum by (namespace, pod) (kube_pod_container_resource_limits{namespace=~"dev|production", resource="cpu"})
+            ) * 100 > 80
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage (>80%) on {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} CPU utilization has exceeded 80% of its configured limit for 2 minutes."
+
+        - alert: HighMemoryUsage
+          expr: >
+            (
+              sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~"dev|production", container!=""})
+              /
+              sum by (namespace, pod) (kube_pod_container_resource_limits{namespace=~"dev|production", resource="memory"})
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High Memory usage (>90%) on {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} memory working set has exceeded 90% of its limit for 2 minutes (risk of OOMKilled)."

@@ -1,0 +1,22 @@
+services:
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: aiops-local-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  aiops-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops-rca-bot
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.example
+    environment:
+      - LOKI_URL=http://loki:3100
+      - K8S_ENABLED=false
+    depends_on:
+      - loki

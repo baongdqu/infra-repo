@@ -1,0 +1,27 @@
+# Reference ArgoCD Application for Part 4 AIOps RCA Bot
+# Copy to infra-repo/argocd/apps/08-aiops-bot.yaml during App-of-Apps integration
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aiops-bot
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/baongdqu/infra-repo.git
+    targetRevision: main
+    path: aiops-bot/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aiops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true

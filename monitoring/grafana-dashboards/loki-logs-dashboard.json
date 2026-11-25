@@ -1,0 +1,91 @@
+{
+  "uid": "devsecops-loki-logs",
+  "title": "DevSecOps Loki Log Explorer",
+  "tags": ["devsecops", "loki", "logs", "aiops"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "custom",
+        "query": "dev,production,aiops,monitoring",
+        "current": { "text": "production", "value": "production" }
+      },
+      {
+        "name": "app",
+        "type": "custom",
+        "query": "backend,frontend,postgres,redis,aiops-bot",
+        "current": { "text": "backend", "value": "backend" }
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "query": ".*,ERROR|FATAL|WARN,INFO",
+        "current": { "text": ".*", "value": ".*" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log Volume by Service (lines/min)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (app) (rate({namespace=\"$namespace\"}[1m]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error & Fatal Log Spikes",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (count_over_time({namespace=\"$namespace\", app=\"$app\"} |~ \"(?i)(error|fatal|exception|oom)\"[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Filtered Application Log Stream",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 7 },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{namespace=\"$namespace\", app=\"$app\"} |~ \"$level\""
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Recent Exception Stack Traces",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 21 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{namespace=\"$namespace\"} |~ \"(?i)(error|exception|traceback|crash)\""
+        }
+      ]
+    }
+  ]
+}
